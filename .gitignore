@@ -1,0 +1,7 @@
+__pycache__
+
+env/*
+
+core/environments/data/*
+core/runs/*
+core/checkpoints/*
