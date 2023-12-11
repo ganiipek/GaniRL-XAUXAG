@@ -1,6 +1,5 @@
 import numpy as np
 import pandas as pd
-import talib as ta
 from datetime import datetime, timedelta
 import tensorflow as tf
 from tensorflow.keras.optimizers.legacy import Adam, RMSprop
@@ -28,7 +27,7 @@ if __name__ == '__main__':
     #               alpha=alpha, n_epochs=n_epochs,
     #               input_dims=50)
     agent = CustomAgent(lookback_window_size=lookback_window_size, lr=0.00001, epochs=5, optimizer=Adam, batch_size = batch_size, model="CNN")
-    train_multiprocessing(RatioEnv, agent, train_df, num_worker = 16, training_batch_size=500, lookback_window_size=lookback_window_size, EPISODES=200000)
+    train_multiprocessing(RatioEnv, agent, train_df, num_worker = 1, training_batch_size=500, lookback_window_size=lookback_window_size, EPISODES=200000)
     
 # if __name__ == '__main__':
 #     # The algorithms require a vectorized environment to run

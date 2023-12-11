@@ -162,9 +162,8 @@ class RatioEnv:
             initial_balance=100000, commission_per_100k_volume=3,
             lookback_window_size=50, verbose=False
         ):
-        data = data.reset_index()
-        self.historical_data = data.to_numpy()
-
+        self.historical_data = data
+        
         self.initial_balance = initial_balance
         self.lookback_window_size = lookback_window_size
         self.verbose=verbose
@@ -224,9 +223,12 @@ class RatioEnv:
         self.transaction_history = []
         self.transaction_history_length = 0
         self.market_history = deque(maxlen=self.lookback_window_size)
-        slice_data = self.historical_data[self.current_step - self.lookback_window_size : self.current_step, [1, 2, 3]]
-        for data in slice_data:
-            self.market_history.append(data.tolist())
+        for index, row in self.historical_data[self.current_step-self.lookback_window_size : self.current_step].iterrows():
+            self.market_history.append([
+                row["XAUUSD"],
+                row["XAGUSD"],
+                row["ratio"]
+            ])
 
         self.max_drawdown = 0
         self.punish_value = 0
@@ -237,12 +239,29 @@ class RatioEnv:
         return self.next_observation()
 
     def is_finished(self):
-        if self.current_step >= len(self.historical_data) - 1:
+        if self.current_step >= self.historical_data.index.size - 1:
             return True
         elif self.current_equity < self.initial_balance * 0.1:
             return True
 
         return False
+    
+    def get_intervals(self, train_ratio=0.7, valid_ratio=0.15, test_ratio=0.15):
+        index = self.historical_data.index
+
+        size = len(index)
+        train_begin = 0
+        train_end = int(np.round(train_ratio * size - 1))
+        valid_begin = train_end + 1
+        valid_end = valid_begin + int(np.round(valid_ratio * size - 1))
+        test_begin = valid_end + 1
+        test_end = -1
+        
+        intervals = {'training': (index[train_begin], index[train_end]),
+             'validation': (index[valid_begin], index[valid_end]),
+             'testing': (index[test_begin], index[test_end])}
+
+        return intervals
         
     def calculate_reward(self, action):
         # Ajanın doğru pozisyonu alıp almadığını kontrol et
@@ -345,40 +364,42 @@ class RatioEnv:
 
         return reward
 
-    def next_observation(self):
-        # Gözlemi güncelle
-        obs = self.historical_data[self.current_step, [1, 2, 3]].tolist()  # Sırasıyla XAUUSD, XAGUSD ve ratio sütunlarını al
-        # market_history'e ekle
-        self.market_history.append(obs)
-        # market_history'i np.array'e dönüştür
-        obs_array = np.array(self.market_history)
-        return obs_array
-
     # def next_observation(self):
-    #     xauusd_values = self.historical_data["XAUUSD"].values
-    #     xagusd_values = self.historical_data["XAGUSD"].values
-    #     ratio_values = self.historical_data["ratio"].values
-
-    #     self.market_history.append([xauusd_values[self.current_step], xagusd_values[self.current_step], ratio_values[self.current_step]])
+    #     # Gözlemi güncelle
+    #     # self.update_market_history(self.historical_data.at[self.current_step])
+    #     self.market_history.append([
+    #         self.historical_data.at[self.historical_data.index[self.current_step], "XAUUSD"],
+    #         self.historical_data.at[self.historical_data.index[self.current_step], "XAGUSD"],
+    #         self.historical_data.at[self.historical_data.index[self.current_step], "ratio"]
+    #     ])
+    #     # data = self.historical_data[self.current_step-self.lookback_window_size : self.current_step]["ratio"]
+    #     # observation = np.array(data).T
     #     obs = np.array(self.market_history)
     #     return obs
+
+    def next_observation(self):
+        xauusd_values = self.historical_data["XAUUSD"].values
+        xagusd_values = self.historical_data["XAGUSD"].values
+        ratio_values = self.historical_data["ratio"].values
+
+        self.market_history.append([xauusd_values[self.current_step], xagusd_values[self.current_step], ratio_values[self.current_step]])
+        obs = np.array(self.market_history)
+        return obs
 
 
     def step(self, action:int):
         self.current_step += 1
 
         # Ajanın doğru pozisyonu alıp almadığını kontrol et
-        current_time = self.historical_data[self.current_step, 0]  # Timestamp sütununun indeksi 0
-        current_XAUUSD_price = self.historical_data[self.current_step, 1]  # XAUUSD sütununun indeksi 1
-        current_XAGUSD_price = self.historical_data[self.current_step, 2]  # XAGUSD sütununun indeksi 2
-        current_ratio = self.historical_data[self.current_step, 3]  # ratio sütununun indeksi 3
+        data_index = self.historical_data.index[self.current_step]
+        current_ratio = self.historical_data.at[data_index, "ratio"]
+        # previous_ratio = self.historical_data.at[self.historical_data.index[self.current_step - 1], "ratio"]
 
-        # Veri index'ini kullanarak fiyatları güncelle
-        self.symbol1.price = current_XAUUSD_price
-        self.symbol2.price = current_XAGUSD_price
+        self.symbol1.price = self.historical_data.at[data_index, "XAUUSD"]
+        self.symbol2.price = self.historical_data.at[data_index, "XAGUSD"]
         
         # 1. İşlemi yap
-        reward = self.evaluate_trade(action, current_ratio, current_time)
+        reward = self.evaluate_trade(action, current_ratio, data_index)
         self.total_rewards += reward
 
         # 3. Reward hesapla
@@ -397,7 +418,7 @@ class RatioEnv:
         # 6. Info hesapla
         info = {
             # "timestamp": data_index.timestamp(),
-            "datetime": current_time,
+            "datetime": data_index,
             "current_balance": self.current_balance, 
             "current_equity": self.current_equity,
             "current_margin": self.current_margin,

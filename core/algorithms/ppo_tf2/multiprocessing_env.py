@@ -12,6 +12,7 @@ from collections import deque
 from multiprocessing import Process, Pipe
 import numpy as np
 from datetime import datetime
+from timeit import timeit
 
 class Environment(Process):
     def __init__(self, env_idx, child_conn, env, training_batch_size, visualize):
@@ -26,18 +27,25 @@ class Environment(Process):
         super(Environment, self).run()
         state = self.env.reset()
         self.child_conn.send(state)
+
+        start_time = datetime.now()
         while True:
             reset, net_worth, episode_orders = 0, 0, 0
             action = self.child_conn.recv()
             # if self.env_idx == 0:
             #     self.env.render(self.visualize)
+            start_time2 = datetime.now()
             state, reward, done, info = self.env.step(action)
+            print(f"Worker#{self.env_idx} ... Step Time: {datetime.now()-start_time2}")
 
             if done:
                 net_worth = self.env.current_equity
                 episode_orders = len(self.env.transaction_history)
                 state = self.env.reset()
                 reset = 1
+
+                print(f"Worker#{self.env_idx} ... Trade Time: {datetime.now()-start_time}")
+                start_time = datetime.now()
 
             self.child_conn.send([state, reward, done, reset, net_worth, episode_orders])
 
@@ -89,8 +97,10 @@ def train_multiprocessing(CustomEnv, agent, train_df, num_worker=4, training_bat
             state[worker_id] = next_state
 
             if reset:
+                start_time = datetime.now()
                 episode += 1
                 a_loss, c_loss = agent.replay(states[worker_id], actions[worker_id], rewards[worker_id], predictions[worker_id], dones[worker_id], next_states[worker_id])
+                print(f"Agent replay time: {(datetime.now() - start_time)}")
                 total_average.append(net_worth)
                 average = np.average(total_average)
 

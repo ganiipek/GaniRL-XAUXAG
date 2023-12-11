@@ -48,7 +48,7 @@ class CustomAgent:
 
         self.start_training_log(initial_balance, normalize_value, train_episodes)
             
-    def start_training_log(self, initial_balance, normalize_value, train_episodes):      
+    def start_training_log(self, initial_balance, normalize_value, train_episodes):   
         # save training parameters to Parameters.txt file for future
         with open(self.log_name+"/Parameters.txt", "w") as params:
             current_date = datetime.now().strftime('%Y-%m-%d %H:%M')
@@ -61,6 +61,7 @@ class CustomAgent:
             params.write(f"batch size: {self.batch_size}\n")
             params.write(f"normalize_value: {normalize_value}\n")
             params.write(f"model: {self.model}\n")
+
             
     def end_training_log(self):
         with open(self.log_name+"/Parameters.txt", "a+") as params:

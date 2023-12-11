@@ -48,7 +48,9 @@ class Loader:
 
         df = self.add_indicators(df)
         df = df.dropna()
+        
         print(df.head(10))
+        print(df.to_numpy())
         return df
 
 if __name__ == '__main__':
